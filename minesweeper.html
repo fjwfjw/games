@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230e0e14'/%3E%3Ccircle cx='32' cy='34' r='14' fill='%23c0392b' stroke='%23e74c3c' stroke-width='2'/%3E%3Crect x='28' y='12' width='8' height='14' rx='2' fill='%23c8a85a'/%3E%3Crect x='26' y='8' width='12' height='6' rx='2' fill='%23e8c870'/%3E%3C/svg%3E">
+<title>排雷工程师 — Dota Minesweeper</title>
+<style>
+/* ===== 全局变量 ===== */
+:root {
+  --dota-bg: #0e0e14;
+  --dota-panel: #1a1a24;
+  --dota-card: #22222e;
+  --dota-border: #3a3a48;
+  --dota-gold: #c8a85a;
+  --dota-gold-bright: #e8c870;
+  --dota-red: #c0392b;
+  --dota-green: #27ae60;
+  --dota-blue: #2980b9;
+  --dota-text: #d4d4dc;
+  --dota-text-dim: #888894;
+  --cell-size: 34px;
+  --cell-gap: 2px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+body {
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--dota-bg);
+  color: var(--dota-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 20px;
+  background-image:
+    radial-gradient(ellipse at top, rgba(200,168,90,0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom, rgba(41,128,185,0.03) 0%, transparent 50%);
+}
+
+/* ===== 标题区 ===== */
+.header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.header h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--dota-gold-bright), var(--dota-gold), #b8860b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.header .subtitle {
+  color: var(--dota-text-dim);
+  font-size: 0.85rem;
+  margin-top: 4px;
+  letter-spacing: 1px;
+}
+
+/* ===== 难度选择 ===== */
+.difficulty-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.diff-btn {
+  background: var(--dota-card);
+  border: 2px solid var(--dota-border);
+  color: var(--dota-text-dim);
+  padding: 8px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+}
+
+.diff-btn:hover {
+  border-color: var(--dota-gold);
+  color: var(--dota-gold-bright);
+}
+
+.diff-btn.active {
+  background: linear-gradient(135deg, rgba(200,168,90,0.2), rgba(200,168,90,0.05));
+  border-color: var(--dota-gold);
+  color: var(--dota-gold-bright);
+  box-shadow: 0 0 12px rgba(200,168,90,0.15);
+}
+
+.diff-btn .diff-info {
+  font-size: 0.7rem;
+  display: block;
+  margin-top: 2px;
+  opacity: 0.7;
+}
+
+/* ===== 信息面板 ===== */
+.info-panel {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  background: var(--dota-panel);
+  border: 1px solid var(--dota-border);
+  border-radius: 10px;
+  padding: 12px 24px;
+  margin-bottom: 16px;
+  min-width: 320px;
+  justify-content: center;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.info-item .label {
+  font-size: 0.7rem;
+  color: var(--dota-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.info-item .value {
+  min-width: 50px;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+}
+
+.mine-counter .value { color: var(--dota-red); }
+.timer .value { color: var(--dota-gold-bright); }
+
+/* ===== 重置按钮 ===== */
+.reset-btn {
+  background: var(--dota-card);
+  border: 2px solid var(--dota-border);
+  border-radius: 50%;
+  width: 46px;
+  height: 46px;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.reset-btn:hover {
+  border-color: var(--dota-gold);
+  transform: scale(1.05);
+}
+
+.reset-btn:active {
+  transform: scale(0.95);
+}
+
+/* ===== 游戏棋盘 ===== */
+.board-container {
+  background: var(--dota-panel);
+  border: 1px solid var(--dota-border);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.board {
+  display: grid;
+  gap: var(--cell-gap);
+}
+
+/* ===== 格子 ===== */
+.cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  background: linear-gradient(135deg, #3a3a48, #2a2a34);
+  border: 1px solid #4a4a58;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.1s;
+  position: relative;
+}
+
+.cell:hover:not(.revealed):not(.flagged) {
+  background: linear-gradient(135deg, #4a4a58, #3a3a48);
+  border-color: var(--dota-gold);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(200,168,90,0.2);
+}
+
+.cell:active:not(.revealed):not(.flagged) {
+  transform: translateY(0);
+}
+
+.cell.revealed {
+  background: var(--dota-card);
+  border-color: var(--dota-border);
+  cursor: default;
+  animation: revealPop 0.2s ease;
+}
+
+@keyframes revealPop {
+  0% { transform: scale(0.85); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.cell.flagged::before {
+  content: '🚩';
+  font-size: 0.85rem;
+  filter: drop-shadow(0 0 2px rgba(192,57,43,0.5));
+}
+
+.cell.mine {
+  background: radial-gradient(circle, #c0392b, #7a1f15);
+  animation: mineExplode 0.4s ease;
+}
+
+.cell.mine::before {
+  content: '💣';
+  font-size: 1.1rem;
+}
+
+.cell.mine-exploded {
+  background: radial-gradient(circle, #e74c3c, #922b21);
+  animation: bigExplosion 0.5s ease;
+}
+
+.cell.mine-exploded::before {
+  content: '💥';
+  font-size: 1.2rem;
+}
+
+@keyframes mineExplode {
+  0% { transform: scale(0.5); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+@keyframes bigExplosion {
+  0% { transform: scale(0.5); box-shadow: 0 0 0 rgba(231,76,60,0.8); }
+  50% { transform: scale(1.2); box-shadow: 0 0 20px rgba(231,76,60,0.8); }
+  100% { transform: scale(1); box-shadow: 0 0 0 rgba(231,76,60,0); }
+}
+
+/* 数字颜色 */
+.cell.n1 { color: #5dade2; }
+.cell.n2 { color: #58d68d; }
+.cell.n3 { color: #ec7063; }
+.cell.n4 { color: #af7ac5; }
+.cell.n5 { color: #f39c12; }
+.cell.n6 { color: #48c9b0; }
+.cell.n7 { color: #d5d8dc; }
+.cell.n8 { color: #abb2b9; }
+
+.cell.flag-wrong {
+  background: var(--dota-card);
+  opacity: 0.5;
+}
+
+.cell.flag-wrong::before {
+  content: '❌';
+}
+
+/* ===== 胜负覆盖层 ===== */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.overlay.show {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.overlay-card {
+  background: var(--dota-panel);
+  border: 2px solid var(--dota-border);
+  border-radius: 16px;
+  padding: 40px 60px;
+  text-align: center;
+  transform: scale(0.8);
+  transition: transform 0.3s;
+}
+
+.overlay.show .overlay-card {
+  transform: scale(1);
+}
+
+.overlay-card.win {
+  border-color: var(--dota-green);
+  box-shadow: 0 0 40px rgba(39,174,96,0.2);
+}
+
+.overlay-card.lose {
+  border-color: var(--dota-red);
+  box-shadow: 0 0 40px rgba(192,57,43,0.2);
+}
+
+.overlay-card .result-icon {
+  font-size: 3.5rem;
+  margin-bottom: 12px;
+}
+
+.overlay-card h2 {
+  font-size: 1.8rem;
+  margin-bottom: 8px;
+  letter-spacing: 2px;
+}
+
+.overlay-card.win h2 { color: var(--dota-green); }
+.overlay-card.lose h2 { color: var(--dota-red); }
+
+.overlay-card p {
+  color: var(--dota-text-dim);
+  margin-bottom: 24px;
+  font-size: 0.95rem;
+}
+
+.overlay-card .play-again {
+  background: linear-gradient(135deg, var(--dota-gold), #b8860b);
+  color: #1a1a24;
+  border: none;
+  padding: 12px 36px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+}
+
+.overlay-card .play-again:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 20px rgba(200,168,90,0.3);
+}
+
+/* ===== 说明 ===== */
+.instructions {
+  margin-top: 20px;
+  text-align: center;
+  color: var(--dota-text-dim);
+  font-size: 0.8rem;
+  line-height: 1.8;
+  max-width: 500px;
+}
+
+.instructions kbd {
+  background: var(--dota-card);
+  border: 1px solid var(--dota-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-family: monospace;
+  color: var(--dota-gold-bright);
+}
+
+/* ===== 顶部返回栏 ===== */
+.top-bar {
+  width: 100%;
+  max-width: 600px;
+  margin-bottom: 12px;
+}
+
+.back-btn {
+  display: inline-block;
+  color: var(--dota-text-dim);
+  text-decoration: none;
+  font-size: 0.85rem;
+  padding: 6px 14px;
+  border: 1px solid var(--dota-border);
+  border-radius: 6px;
+  background: var(--dota-card);
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  color: var(--dota-gold-bright);
+  border-color: var(--dota-gold);
+}
+
+/* ===== 移动端模式切换 ===== */
+.mode-toggle {
+  display: none;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mode-btn {
+  padding: 8px 18px;
+  border-radius: 6px;
+  border: 1px solid var(--dota-border);
+  background: var(--dota-card);
+  color: var(--dota-text-dim);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+}
+
+.mode-btn.active {
+  background: var(--dota-gold);
+  color: var(--dota-bg);
+  border-color: var(--dota-gold);
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 600px) {
+  :root { --cell-size: 28px; }
+  .header h1 { font-size: 1.4rem; }
+  .info-panel { gap: 15px; min-width: 280px; padding: 10px 16px; }
+  .info-item { font-size: 1.1rem; }
+  .mode-toggle { display: flex; }
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="index.html" class="back-btn">← 返回游戏目录</a>
+</div>
+
+<div class="header">
+  <h1>💣 排雷工程师</h1>
+  <div class="subtitle">DOTA MINESWEEPER — 炸弹人的地雷阵</div>
+</div>
+
+<!-- 难度选择 -->
+<div class="difficulty-bar" id="diffBar">
+  <button class="diff-btn active" data-diff="easy">
+    普通难度
+    <span class="diff-info">9×9 · 10雷</span>
+  </button>
+  <button class="diff-btn" data-diff="medium">
+    困难难度
+    <span class="diff-info">16×16 · 40雷</span>
+  </button>
+  <button class="diff-btn" data-diff="hard">
+    地狱难度
+    <span class="diff-info">30×16 · 99雷</span>
+  </button>
+</div>
+
+<!-- 移动端模式切换 -->
+<div class="mode-toggle">
+  <button class="mode-btn active" data-mode="dig">⛏️ 挖掘</button>
+  <button class="mode-btn" data-mode="flag">🚩 标记</button>
+</div>
+
+<!-- 信息面板 -->
+<div class="info-panel">
+  <div class="info-item mine-counter">
+    <span class="label">剩余地雷</span>
+    <span class="value" id="mineCount">10</span>
+  </div>
+  <button class="reset-btn" id="resetBtn" title="重新开始">�</button>
+  <div class="info-item timer">
+    <span class="label">用时</span>
+    <span class="value" id="timer">000</span>
+  </div>
+</div>
+
+<!-- 游戏棋盘 -->
+<div class="board-container">
+  <div class="board" id="board"></div>
+</div>
+
+<!-- 说明 -->
+<div class="instructions">
+  <kbd>左键</kbd> 排查格子 &nbsp; <kbd>右键</kbd> 标记地雷 &nbsp; <kbd>双击数字</kbd> 快速排查<br>
+  首次点击安全，排查所有非雷格子即可获胜！
+</div>
+
+<!-- 胜负覆盖层 -->
+<div class="overlay" id="overlay">
+  <div class="overlay-card" id="overlayCard">
+    <div class="result-icon" id="resultIcon"></div>
+    <h2 id="resultTitle"></h2>
+    <p id="resultDesc"></p>
+    <button class="play-again" id="playAgainBtn">再来一局</button>
+  </div>
+</div>
+
+<script>
+// ==================== 游戏配置 ====================
+const DIFFICULTIES = {
+  easy:   { rows: 9,  cols: 9,  mines: 10 },
+  medium: { rows: 16, cols: 16, mines: 40 },
+  hard:   { rows: 16, cols: 30, mines: 99 },
+};
+
+// ==================== 游戏状态 ====================
+let game = {
+  diff: 'easy',
+  rows: 9,
+  cols: 9,
+  mines: 10,
+  board: [],       // 二维数组：{mine, revealed, flagged, count}
+  flagCount: 0,
+  revealedCount: 0,
+  firstClick: true,
+  gameOver: false,
+  won: false,
+  timer: 0,
+  timerInterval: null,
+};
+
+// 移动端触控状态
+let touchMode = 'dig';          // 'dig' | 'flag'
+let longPressTriggered = false; // 长按是否已触发
+
+// ==================== DOM 元素 ====================
+const boardEl = document.getElementById('board');
+const mineCountEl = document.getElementById('mineCount');
+const timerEl = document.getElementById('timer');
+const resetBtn = document.getElementById('resetBtn');
+const diffBar = document.getElementById('diffBar');
+const overlay = document.getElementById('overlay');
+const overlayCard = document.getElementById('overlayCard');
+const resultIcon = document.getElementById('resultIcon');
+const resultTitle = document.getElementById('resultTitle');
+const resultDesc = document.getElementById('resultDesc');
+const playAgainBtn = document.getElementById('playAgainBtn');
+
+// ==================== 初始化 ====================
+function initGame() {
+  const cfg = DIFFICULTIES[game.diff];
+  game.rows = cfg.rows;
+  game.cols = cfg.cols;
+  game.mines = cfg.mines;
+  game.flagCount = 0;
+  game.revealedCount = 0;
+  game.firstClick = true;
+  game.gameOver = false;
+  game.won = false;
+  game.timer = 0;
+
+  // 停止计时器
+  if (game.timerInterval) {
+    clearInterval(game.timerInterval);
+    game.timerInterval = null;
+  }
+
+  // 初始化棋盘数据
+  game.board = [];
+  for (let r = 0; r < game.rows; r++) {
+    const row = [];
+    for (let c = 0; c < game.cols; c++) {
+      row.push({ mine: false, revealed: false, flagged: false, count: 0 });
+    }
+    game.board.push(row);
+  }
+
+  renderBoard();
+  updateMineCount();
+  updateTimer();
+  resetBtn.textContent = '😎';
+  hideOverlay();
+}
+
+// ==================== 布雷 ====================
+function placeMines(safeR, safeC) {
+  // 首次点击安全：不在点击位置及周围8格放雷
+  const safeSet = new Set();
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      const nr = safeR + dr;
+      const nc = safeC + dc;
+      if (nr >= 0 && nr < game.rows && nc >= 0 && nc < game.cols) {
+        safeSet.add(nr * game.cols + nc);
+      }
+    }
+  }
+
+  let placed = 0;
+  while (placed < game.mines) {
+    const r = Math.floor(Math.random() * game.rows);
+    const c = Math.floor(Math.random() * game.cols);
+    if (game.board[r][c].mine) continue;
+    if (safeSet.has(r * game.cols + c)) continue;
+    game.board[r][c].mine = true;
+    placed++;
+  }
+
+  // 计算每个格子周围的地雷数
+  for (let r = 0; r < game.rows; r++) {
+    for (let c = 0; c < game.cols; c++) {
+      if (game.board[r][c].mine) continue;
+      let count = 0;
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          const nr = r + dr;
+          const nc = c + dc;
+          if (nr >= 0 && nr < game.rows && nc >= 0 && nc < game.cols) {
+            if (game.board[nr][nc].mine) count++;
+          }
+        }
+      }
+      game.board[r][c].count = count;
+    }
+  }
+}
+
+// ==================== 渲染棋盘 ====================
+function renderBoard() {
+  boardEl.innerHTML = '';
+  boardEl.style.gridTemplateColumns = `repeat(${game.cols}, var(--cell-size))`;
+  for (let r = 0; r < game.rows; r++) {
+    for (let c = 0; c < game.cols; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.r = r;
+      cell.dataset.c = c;
+
+      // 左键点击
+      cell.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (longPressTriggered) return; // 长按已处理
+        // 移动端标记模式
+        if (touchMode === 'flag' && !game.board[r][c].revealed) {
+          handleFlag(r, c);
+        } else {
+          handleClick(r, c);
+        }
+      });
+
+      // 右键标记
+      cell.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        handleFlag(r, c);
+      });
+
+      // 双击快速排查
+      cell.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        handleChord(r, c);
+      });
+
+      boardEl.appendChild(cell);
+    }
+  }
+}
+
+// ==================== 更新单个格子显示 ====================
+function updateCellDisplay(r, c) {
+  const cellEl = boardEl.children[r * game.cols + c];
+  const data = game.board[r][c];
+  cellEl.className = 'cell';
+
+  if (data.flagged) {
+    cellEl.classList.add('flagged');
+    return;
+  }
+
+  if (!data.revealed) return;
+
+  cellEl.classList.add('revealed');
+
+  if (data.mine) {
+    cellEl.classList.add('mine');
+  } else if (data.count > 0) {
+    cellEl.textContent = data.count;
+    cellEl.classList.add('n' + data.count);
+  }
+}
+
+// ==================== 点击处理 ====================
+function handleClick(r, c) {
+  if (game.gameOver) return;
+  const data = game.board[r][c];
+  if (data.revealed || data.flagged) return;
+
+  // 首次点击：布雷 + 开始计时
+  if (game.firstClick) {
+    game.firstClick = false;
+    placeMines(r, c);
+    startTimer();
+  }
+
+  // 踩雷
+  if (data.mine) {
+    data.revealed = true;
+    revealAllMines(r, c);
+    gameLose();
+    return;
+  }
+
+  // 展开格子
+  revealCell(r, c);
+  checkWin();
+}
+
+// ==================== 展开格子（含递归展开空白区域）====================
+function revealCell(r, c) {
+  const data = game.board[r][c];
+  if (data.revealed || data.flagged || data.mine) return;
+
+  data.revealed = true;
+  game.revealedCount++;
+  updateCellDisplay(r, c);
+
+  // 如果是空格子（周围无雷），递归展开周围格子
+  if (data.count === 0) {
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr >= 0 && nr < game.rows && nc >= 0 && nc < game.cols) {
+          revealCell(nr, nc);
+        }
+      }
+    }
+  }
+}
+
+// ==================== 标记/取消标记 ====================
+function handleFlag(r, c) {
+  if (game.gameOver) return;
+  const data = game.board[r][c];
+  if (data.revealed) return;
+
+  if (data.flagged) {
+    data.flagged = false;
+    game.flagCount--;
+  } else {
+    data.flagged = true;
+    game.flagCount++;
+  }
+  updateCellDisplay(r, c);
+  updateMineCount();
+}
+
+// ==================== 双击快速排查（chord）====================
+function handleChord(r, c) {
+  if (game.gameOver) return;
+  const data = game.board[r][c];
+  if (!data.revealed || data.count === 0) return;
+
+  // 统计周围标记数
+  let flagCount = 0;
+  const neighbors = [];
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr >= 0 && nr < game.rows && nc >= 0 && nc < game.cols) {
+        if (game.board[nr][nc].flagged) flagCount++;
+        else if (!game.board[nr][nc].revealed) neighbors.push([nr, nc]);
+      }
+    }
+  }
+
+  // 标记数等于数字时，自动展开未标记的格子
+  if (flagCount === data.count) {
+    for (const [nr, nc] of neighbors) {
+      if (game.board[nr][nc].mine) {
+        game.board[nr][nc].revealed = true;
+        revealAllMines(nr, nc);
+        gameLose();
+        return;
+      }
+      revealCell(nr, nc);
+    }
+    checkWin();
+  }
+}
+
+// ==================== 显示所有地雷 ====================
+function revealAllMines(explodedR, explodedC) {
+  for (let r = 0; r < game.rows; r++) {
+    for (let c = 0; c < game.cols; c++) {
+      const data = game.board[r][c];
+      if (data.mine && !data.revealed) {
+        data.revealed = true;
+        const cellEl = boardEl.children[r * game.cols + c];
+        cellEl.className = 'cell revealed mine';
+        if (r === explodedR && c === explodedC) {
+          cellEl.classList.add('mine-exploded');
+        }
+      }
+      // 标记错误的格子
+      if (!data.mine && data.flagged) {
+        const cellEl = boardEl.children[r * game.cols + c];
+        cellEl.className = 'cell flag-wrong';
+      }
+    }
+  }
+}
+
+// ==================== 胜负判定 ====================
+function checkWin() {
+  const totalSafe = game.rows * game.cols - game.mines;
+  if (game.revealedCount >= totalSafe) {
+    gameWin();
+  }
+}
+
+function gameWin() {
+  game.gameOver = true;
+  game.won = true;
+  stopTimer();
+  resetBtn.textContent = '🏆';
+
+  // 自动标记所有未标记的地雷
+  for (let r = 0; r < game.rows; r++) {
+    for (let c = 0; c < game.cols; c++) {
+      if (game.board[r][c].mine && !game.board[r][c].flagged) {
+        game.board[r][c].flagged = true;
+        updateCellDisplay(r, c);
+      }
+    }
+  }
+  game.flagCount = game.mines;
+  updateMineCount();
+
+  setTimeout(() => showOverlay(true), 400);
+}
+
+function gameLose() {
+  game.gameOver = true;
+  game.won = false;
+  stopTimer();
+  resetBtn.textContent = '�';
+  setTimeout(() => showOverlay(false), 800);
+}
+
+// ==================== 覆盖层 ====================
+function showOverlay(won) {
+  overlayCard.className = 'overlay-card ' + (won ? 'win' : 'lose');
+  if (won) {
+    resultIcon.textContent = '🏆';
+    resultTitle.textContent = '排雷成功！';
+    resultDesc.textContent = `用时 ${game.timer} 秒，你是真正的排雷工程师！`;
+  } else {
+    resultIcon.textContent = '💥';
+    resultTitle.textContent = '被炸飞了！';
+    resultDesc.textContent = `踩到地雷了，用时 ${game.timer} 秒，再来一次吧！`;
+  }
+  overlay.classList.add('show');
+}
+
+function hideOverlay() {
+  overlay.classList.remove('show');
+}
+
+// ==================== 计时器 ====================
+function startTimer() {
+  game.timerInterval = setInterval(() => {
+    game.timer++;
+    if (game.timer > 999) game.timer = 999;
+    updateTimer();
+  }, 1000);
+}
+
+function stopTimer() {
+  if (game.timerInterval) {
+    clearInterval(game.timerInterval);
+    game.timerInterval = null;
+  }
+}
+
+function updateTimer() {
+  timerEl.textContent = String(game.timer).padStart(3, '0');
+}
+
+function updateMineCount() {
+  mineCountEl.textContent = String(Math.max(0, game.mines - game.flagCount)).padStart(3, '0');
+}
+
+// ==================== 事件绑定 ====================
+resetBtn.addEventListener('click', initGame);
+playAgainBtn.addEventListener('click', initGame);
+
+diffBar.addEventListener('click', (e) => {
+  const btn = e.target.closest('.diff-btn');
+  if (!btn) return;
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  game.diff = btn.dataset.diff;
+  initGame();
+});
+
+// 移动端模式切换
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    touchMode = btn.dataset.mode;
+  });
+});
+
+// 移动端长按标记
+let longPressTimer = null;
+
+boardEl.addEventListener('touchstart', (e) => {
+  const cellEl = e.target.closest('.cell');
+  if (!cellEl || game.gameOver) return;
+  longPressTriggered = false;
+  longPressTimer = setTimeout(() => {
+    longPressTriggered = true;
+    const r = parseInt(cellEl.dataset.r);
+    const c = parseInt(cellEl.dataset.c);
+    handleFlag(r, c);
+    // 触觉反馈
+    if (navigator.vibrate) navigator.vibrate(30);
+  }, 400);
+}, { passive: true });
+
+boardEl.addEventListener('touchmove', () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}, { passive: true });
+
+boardEl.addEventListener('touchend', (e) => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  // 如果长按已触发，阻止后续 click
+  if (longPressTriggered) {
+    e.preventDefault();
+    longPressTriggered = false;
+  }
+}, { passive: false });
+
+// 阻止整个棋盘的右键菜单
+boardEl.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// ==================== 启动 ====================
+initGame();
+</script>
+
+</body>
+</html>

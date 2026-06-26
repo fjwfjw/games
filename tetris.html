@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230e0e14'/%3E%3Crect x='12' y='12' width='18' height='18' rx='3' fill='%232980b9'/%3E%3Crect x='34' y='12' width='18' height='18' rx='3' fill='%23c8a85a'/%3E%3Crect x='12' y='34' width='18' height='18' rx='3' fill='%2327ae60'/%3E%3Crect x='34' y='34' width='18' height='18' rx='3' fill='%23c0392b'/%3E%3C/svg%3E">
+<title>俄罗斯方块 — Dota Arcade</title>
+<style>
+:root {
+  --dota-bg: #0e0e14;
+  --dota-panel: #1a1a24;
+  --dota-card: #22222e;
+  --dota-border: #3a3a48;
+  --dota-gold: #c8a85a;
+  --dota-gold-bright: #e8c870;
+  --dota-red: #c0392b;
+  --dota-green: #27ae60;
+  --dota-blue: #2980b9;
+  --dota-text: #d4d4dc;
+  --dota-text-dim: #888894;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--dota-bg);
+  color: var(--dota-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(ellipse at top, rgba(41,128,185,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom, rgba(142,68,173,0.04) 0%, transparent 50%);
+}
+
+/* ===== 顶部栏 ===== */
+.top-bar {
+  width: 100%;
+  max-width: 480px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.back-btn {
+  display: inline-block;
+  color: var(--dota-text-dim);
+  text-decoration: none;
+  font-size: 0.85rem;
+  padding: 6px 14px;
+  border: 1px solid var(--dota-border);
+  border-radius: 6px;
+  background: var(--dota-card);
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  color: var(--dota-gold-bright);
+  border-color: var(--dota-gold);
+}
+
+.game-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--dota-gold-bright);
+  letter-spacing: 2px;
+}
+
+/* ===== 游戏主区 ===== */
+.game-wrapper {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: center;
+  max-width: 100%;
+}
+
+.game-main {
+  position: relative;
+}
+
+#board {
+  display: block;
+  background: var(--dota-panel);
+  border: 2px solid var(--dota-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+/* ===== 侧边面板 ===== */
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 120px;
+}
+
+.panel-box {
+  background: var(--dota-panel);
+  border: 1px solid var(--dota-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  text-align: center;
+}
+
+.panel-box .label {
+  font-size: 0.65rem;
+  color: var(--dota-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 4px;
+}
+
+.panel-box .value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-family: 'Courier New', monospace;
+  color: var(--dota-gold-bright);
+}
+
+.panel-box.score .value { color: var(--dota-green); }
+.panel-box.level .value { color: var(--dota-blue); }
+
+#nextCanvas {
+  display: block;
+  margin: 0 auto;
+  background: var(--dota-card);
+  border-radius: 6px;
+}
+
+/* ===== 暂停/开始覆盖层 ===== */
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10,10,16,0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+.overlay.show {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.overlay h2 {
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+  letter-spacing: 2px;
+}
+
+.overlay h2.win { color: var(--dota-green); }
+.overlay h2.lose { color: var(--dota-red); }
+.overlay h2.pause { color: var(--dota-gold-bright); }
+
+.overlay p {
+  color: var(--dota-text-dim);
+  font-size: 0.85rem;
+  margin-bottom: 20px;
+}
+
+.overlay button {
+  background: linear-gradient(135deg, var(--dota-gold), #b8860b);
+  color: #1a1a24;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+
+.overlay button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 20px rgba(200,168,90,0.3);
+}
+
+/* ===== 移动端控制按钮 ===== */
+.mobile-controls {
+  display: none;
+  width: 100%;
+  max-width: 480px;
+  margin-top: 14px;
+  gap: 8px;
+}
+
+.ctrl-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.ctrl-btn {
+  flex: 1;
+  background: var(--dota-card);
+  border: 1px solid var(--dota-border);
+  border-radius: 10px;
+  color: var(--dota-text);
+  font-size: 1.5rem;
+  padding: 18px 0;
+  cursor: pointer;
+  transition: all 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.ctrl-btn:active {
+  background: var(--dota-gold);
+  color: var(--dota-bg);
+  transform: scale(0.95);
+}
+
+.ctrl-btn.rotate {
+  background: linear-gradient(135deg, rgba(200,168,90,0.15), var(--dota-card));
+  border-color: rgba(200,168,90,0.3);
+}
+
+.ctrl-btn.hard-drop {
+  background: linear-gradient(135deg, rgba(192,57,43,0.15), var(--dota-card));
+  border-color: rgba(192,57,43,0.3);
+}
+
+/* ===== 说明 ===== */
+.instructions {
+  margin-top: 14px;
+  text-align: center;
+  color: var(--dota-text-dim);
+  font-size: 0.75rem;
+  line-height: 1.7;
+  max-width: 480px;
+}
+
+.instructions kbd {
+  background: var(--dota-card);
+  border: 1px solid var(--dota-border);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 0.7rem;
+  color: var(--dota-gold-bright);
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 600px) {
+  .game-wrapper {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .side-panel {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    min-width: auto;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .panel-box {
+    flex: 1;
+    min-width: 70px;
+    padding: 8px;
+  }
+
+  .panel-box .value { font-size: 1.1rem; }
+
+  #nextCanvas { width: 60px; height: 60px; }
+
+  .mobile-controls { display: block; }
+
+  .instructions { display: none; }
+}
+
+@media (max-width: 380px) {
+  .ctrl-btn { font-size: 1.3rem; padding: 14px 0; min-height: 52px; }
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="index.html" class="back-btn">← 返回目录</a>
+  <div class="game-title">🟦 俄罗斯方块</div>
+  <div style="width: 90px;"></div>
+</div>
+
+<div class="game-wrapper">
+  <div class="game-main">
+    <canvas id="board" width="300" height="600"></canvas>
+    <div class="overlay" id="overlay">
+      <h2 id="overlayTitle">准备就绪</h2>
+      <p id="overlayDesc">按开始或空格键开始游戏</p>
+      <button id="startBtn">开始游戏</button>
+    </div>
+  </div>
+
+  <div class="side-panel">
+    <div class="panel-box score">
+      <div class="label">分数</div>
+      <div class="value" id="score">0</div>
+    </div>
+    <div class="panel-box level">
+      <div class="label">等级</div>
+      <div class="value" id="level">1</div>
+    </div>
+    <div class="panel-box">
+      <div class="label">行数</div>
+      <div class="value" id="lines">0</div>
+    </div>
+    <div class="panel-box">
+      <div class="label">下一个</div>
+      <canvas id="nextCanvas" width="80" height="80"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- 移动端控制 -->
+<div class="mobile-controls">
+  <div class="ctrl-row">
+    <button class="ctrl-btn rotate" data-action="rotate">🔄</button>
+    <button class="ctrl-btn hard-drop" data-action="drop">⬇️⬇️</button>
+    <button class="ctrl-btn" data-action="pause">⏸️</button>
+  </div>
+  <div class="ctrl-row">
+    <button class="ctrl-btn" data-action="left">⬅️</button>
+    <button class="ctrl-btn" data-action="down">⬇️</button>
+    <button class="ctrl-btn" data-action="right">➡️</button>
+  </div>
+</div>
+
+<div class="instructions">
+  <kbd>←→</kbd> 移动 &nbsp; <kbd>↓</kbd> 加速 &nbsp; <kbd>↑</kbd> 旋转 &nbsp; <kbd>空格</kbd> 暂停/开始 &nbsp; <kbd>Shift</kbd> 硬降<br>
+  移动端可使用屏幕按钮，或左右滑动移动、向下滑动加速
+</div>
+
+<script>
+// ==================== 配置 ====================
+const COLS = 10;
+const ROWS = 20;
+const BLOCK = 30;
+
+// 方块颜色（Dota 风格）
+const COLORS = {
+  I: '#2980b9',
+  O: '#c8a85a',
+  T: '#8e44ad',
+  S: '#27ae60',
+  Z: '#c0392b',
+  J: '#4a6fa5',
+  L: '#e67e22',
+};
+
+// 方块形状
+const SHAPES = {
+  I: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+  O: [[1,1],[1,1]],
+  T: [[0,1,0],[1,1,1],[0,0,0]],
+  S: [[0,1,1],[1,1,0],[0,0,0]],
+  Z: [[1,1,0],[0,1,1],[0,0,0]],
+  J: [[1,0,0],[1,1,1],[0,0,0]],
+  L: [[0,0,1],[1,1,1],[0,0,0]],
+};
+
+const TYPES = Object.keys(SHAPES);
+
+// ==================== 画布 ====================
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const nextCanvas = document.getElementById('nextCanvas');
+const nextCtx = nextCanvas.getContext('2d');
+
+// ==================== 游戏状态 ====================
+let board = [];
+let current = null;   // {type, shape, x, y}
+let nextType = null;
+let score = 0;
+let level = 1;
+let lines = 0;
+let dropInterval = 1000;
+let dropTimer = 0;
+let lastTime = 0;
+let isPlaying = false;
+let isPaused = false;
+let gameOver = false;
+let animFrame = null;
+
+// ==================== DOM ====================
+const scoreEl = document.getElementById('score');
+const levelEl = document.getElementById('level');
+const linesEl = document.getElementById('lines');
+const overlay = document.getElementById('overlay');
+const overlayTitle = document.getElementById('overlayTitle');
+const overlayDesc = document.getElementById('overlayDesc');
+const startBtn = document.getElementById('startBtn');
+
+// ==================== 初始化棋盘 ====================
+function initBoard() {
+  board = [];
+  for (let r = 0; r < ROWS; r++) {
+    board.push(new Array(COLS).fill(null));
+  }
+}
+
+// ==================== 创建方块 ====================
+function newPiece(type) {
+  type = type || TYPES[Math.floor(Math.random() * TYPES.length)];
+  const shape = SHAPES[type].map(row => [...row]);
+  return {
+    type,
+    shape,
+    x: Math.floor((COLS - shape[0].length) / 2),
+    y: 0,
+  };
+}
+
+// ==================== 旋转方块 ====================
+function rotate(shape) {
+  const N = shape.length;
+  const rotated = [];
+  for (let i = 0; i < N; i++) {
+    rotated.push(new Array(N).fill(0));
+  }
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      rotated[c][N - 1 - r] = shape[r][c];
+    }
+  }
+  return rotated;
+}
+
+// ==================== 碰撞检测 ====================
+function collide(piece, dx, dy, shape) {
+  shape = shape || piece.shape;
+  for (let r = 0; r < shape.length; r++) {
+    for (let c = 0; c < shape[r].length; c++) {
+      if (!shape[r][c]) continue;
+      const nx = piece.x + c + dx;
+      const ny = piece.y + r + dy;
+      if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
+      if (ny >= 0 && board[ny][nx]) return true;
+    }
+  }
+  return false;
+}
+
+// ==================== 合并到棋盘 ====================
+function merge(piece) {
+  for (let r = 0; r < piece.shape.length; r++) {
+    for (let c = 0; c < piece.shape[r].length; c++) {
+      if (piece.shape[r][c]) {
+        const ny = piece.y + r;
+        const nx = piece.x + c;
+        if (ny >= 0) board[ny][nx] = piece.type;
+      }
+    }
+  }
+}
+
+// ==================== 消行 ====================
+function clearLines() {
+  let cleared = 0;
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (board[r].every(cell => cell !== null)) {
+      board.splice(r, 1);
+      board.unshift(new Array(COLS).fill(null));
+      cleared++;
+      r++;
+    }
+  }
+  if (cleared > 0) {
+    const points = [0, 100, 300, 500, 800];
+    score += points[cleared] * level;
+    lines += cleared;
+    // 升级
+    const newLevel = Math.floor(lines / 10) + 1;
+    if (newLevel > level) {
+      level = newLevel;
+      dropInterval = Math.max(100, 1000 - (level - 1) * 80);
+    }
+    updateUI();
+  }
+}
+
+// ==================== 绘制 ====================
+function drawBlock(context, x, y, type, size) {
+  const color = COLORS[type];
+  if (!color) return;
+
+  // 主体
+  context.fillStyle = color;
+  context.fillRect(x, y, size, size);
+
+  // 高光（上+左）
+  context.fillStyle = 'rgba(255,255,255,0.25)';
+  context.fillRect(x, y, size, 3);
+  context.fillRect(x, y, 3, size);
+
+  // 阴影（下+右）
+  context.fillStyle = 'rgba(0,0,0,0.35)';
+  context.fillRect(x, y + size - 3, size, 3);
+  context.fillRect(x + size - 3, y, 3, size);
+
+  // 边框
+  context.strokeStyle = 'rgba(0,0,0,0.4)';
+  context.lineWidth = 1;
+  context.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
+}
+
+function draw() {
+  // 清空
+  ctx.fillStyle = '#1a1a24';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 网格线
+  ctx.strokeStyle = 'rgba(58,58,72,0.4)';
+  ctx.lineWidth = 1;
+  for (let c = 1; c < COLS; c++) {
+    ctx.beginPath();
+    ctx.moveTo(c * BLOCK, 0);
+    ctx.lineTo(c * BLOCK, canvas.height);
+    ctx.stroke();
+  }
+  for (let r = 1; r < ROWS; r++) {
+    ctx.beginPath();
+    ctx.moveTo(0, r * BLOCK);
+    ctx.lineTo(canvas.width, r * BLOCK);
+    ctx.stroke();
+  }
+
+  // 已落定的方块
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (board[r][c]) {
+        drawBlock(ctx, c * BLOCK, r * BLOCK, board[r][c], BLOCK);
+      }
+    }
+  }
+
+  // 当前方块的投影
+  if (current) {
+    let ghostY = 0;
+    while (!collide(current, 0, ghostY + 1)) ghostY++;
+    for (let r = 0; r < current.shape.length; r++) {
+      for (let c = 0; c < current.shape[r].length; c++) {
+        if (current.shape[r][c]) {
+          const x = (current.x + c) * BLOCK;
+          const y = (current.y + r + ghostY) * BLOCK;
+          ctx.fillStyle = COLORS[current.type] + '22';
+          ctx.fillRect(x, y, BLOCK, BLOCK);
+          ctx.strokeStyle = COLORS[current.type] + '66';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x + 0.5, y + 0.5, BLOCK - 1, BLOCK - 1);
+        }
+      }
+    }
+
+    // 当前方块
+    for (let r = 0; r < current.shape.length; r++) {
+      for (let c = 0; c < current.shape[r].length; c++) {
+        if (current.shape[r][c]) {
+          drawBlock(ctx, (current.x + c) * BLOCK, (current.y + r) * BLOCK, current.type, BLOCK);
+        }
+      }
+    }
+  }
+
+  // 绘制下一个
+  drawNext();
+}
+
+function drawNext() {
+  nextCtx.fillStyle = '#22222e';
+  nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+  if (!nextType) return;
+
+  const shape = SHAPES[nextType];
+  const size = 16;
+  const offsetX = (nextCanvas.width - shape[0].length * size) / 2;
+  const offsetY = (nextCanvas.height - shape.length * size) / 2;
+
+  for (let r = 0; r < shape.length; r++) {
+    for (let c = 0; c < shape[r].length; c++) {
+      if (shape[r][c]) {
+        drawBlock(nextCtx, offsetX + c * size, offsetY + r * size, nextType, size);
+      }
+    }
+  }
+}
+
+// ==================== 操作 ====================
+function move(dx) {
+  if (!current || isPaused || gameOver) return;
+  if (!collide(current, dx, 0)) {
+    current.x += dx;
+    draw();
+  }
+}
+
+function softDrop() {
+  if (!current || isPaused || gameOver) return;
+  if (!collide(current, 0, 1)) {
+    current.y++;
+    score += 1;
+    updateUI();
+    draw();
+  } else {
+    lockPiece();
+  }
+}
+
+function hardDrop() {
+  if (!current || isPaused || gameOver) return;
+  let drop = 0;
+  while (!collide(current, 0, 1)) {
+    current.y++;
+    drop++;
+  }
+  score += drop * 2;
+  updateUI();
+  lockPiece();
+}
+
+function rotatePiece() {
+  if (!current || isPaused || gameOver) return;
+  const rotated = rotate(current.shape);
+  // 墙踢：尝试几个偏移
+  const kicks = [0, -1, 1, -2, 2];
+  for (const kick of kicks) {
+    if (!collide(current, kick, 0, rotated)) {
+      current.shape = rotated;
+      current.x += kick;
+      draw();
+      return;
+    }
+  }
+}
+
+function lockPiece() {
+  merge(current);
+  clearLines();
+  current = newPiece(nextType);
+  nextType = TYPES[Math.floor(Math.random() * TYPES.length)];
+  drawNext();
+
+  if (collide(current, 0, 0)) {
+    endGame();
+  }
+  draw();
+}
+
+// ==================== 游戏循环 ====================
+function update(time) {
+  if (!isPlaying || isPaused || gameOver) {
+    animFrame = requestAnimationFrame(update);
+    return;
+  }
+
+  if (!lastTime) lastTime = time;
+  const delta = time - lastTime;
+  lastTime = time;
+
+  dropTimer += delta;
+  if (dropTimer >= dropInterval) {
+    dropTimer = 0;
+    if (!collide(current, 0, 1)) {
+      current.y++;
+    } else {
+      lockPiece();
+    }
+    draw();
+  }
+
+  animFrame = requestAnimationFrame(update);
+}
+
+// ==================== UI 更新 ====================
+function updateUI() {
+  scoreEl.textContent = score;
+  levelEl.textContent = level;
+  linesEl.textContent = lines;
+}
+
+// ==================== 游戏控制 ====================
+function startGame() {
+  initBoard();
+  score = 0;
+  level = 1;
+  lines = 0;
+  dropInterval = 1000;
+  dropTimer = 0;
+  lastTime = 0;
+  isPlaying = true;
+  isPaused = false;
+  gameOver = false;
+  current = newPiece();
+  nextType = TYPES[Math.floor(Math.random() * TYPES.length)];
+  updateUI();
+  draw();
+  hideOverlay();
+
+  if (animFrame) cancelAnimationFrame(animFrame);
+  animFrame = requestAnimationFrame(update);
+}
+
+function togglePause() {
+  if (!isPlaying || gameOver) return;
+  isPaused = !isPaused;
+  if (isPaused) {
+    showOverlay('暂停中', '按继续或空格键恢复', 'pause', '继续');
+  } else {
+    hideOverlay();
+    lastTime = 0;
+  }
+}
+
+function endGame() {
+  gameOver = true;
+  isPlaying = false;
+  showOverlay('游戏结束', `最终得分 ${score} · 等级 ${level}`, 'lose', '再来一局');
+}
+
+function showOverlay(title, desc, cls, btnText) {
+  overlayTitle.textContent = title;
+  overlayTitle.className = cls;
+  overlayDesc.textContent = desc;
+  startBtn.textContent = btnText;
+  overlay.classList.add('show');
+}
+
+function hideOverlay() {
+  overlay.classList.remove('show');
+}
+
+// ==================== 键盘控制 ====================
+document.addEventListener('keydown', (e) => {
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (!isPlaying || gameOver) {
+      startGame();
+    } else {
+      togglePause();
+    }
+    return;
+  }
+  if (!isPlaying || isPaused || gameOver) return;
+  switch (e.key) {
+    case 'ArrowLeft':  e.preventDefault(); move(-1); break;
+    case 'ArrowRight': e.preventDefault(); move(1); break;
+    case 'ArrowDown':  e.preventDefault(); softDrop(); break;
+    case 'ArrowUp':    e.preventDefault(); rotatePiece(); break;
+    case 'Shift':      e.preventDefault(); hardDrop(); break;
+  }
+});
+
+// ==================== 移动端按钮 ====================
+document.querySelectorAll('.ctrl-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const action = btn.dataset.action;
+    if (action === 'pause') {
+      if (!isPlaying || gameOver) startGame();
+      else togglePause();
+      return;
+    }
+    if (!isPlaying || isPaused || gameOver) return;
+    switch (action) {
+      case 'left':   move(-1); break;
+      case 'right':  move(1); break;
+      case 'down':   softDrop(); break;
+      case 'rotate': rotatePiece(); break;
+      case 'drop':   hardDrop(); break;
+    }
+  });
+});
+
+// ==================== 触摸滑动 ====================
+let touchStartX = 0;
+let touchStartY = 0;
+let touchLastX = 0;
+let touchLastY = 0;
+let touchTime = 0;
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  touchStartX = touchLastX = t.clientX;
+  touchStartY = touchLastY = t.clientY;
+  touchTime = Date.now();
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (!isPlaying || isPaused || gameOver) return;
+  const t = e.touches[0];
+  const dx = t.clientX - touchLastX;
+  const dy = t.clientY - touchLastY;
+
+  // 水平移动（每 30px 触发一次）
+  if (Math.abs(dx) >= 30) {
+    move(dx > 0 ? 1 : -1);
+    touchLastX = t.clientX;
+  }
+
+  // 向下加速（每 30px 触发一次）
+  if (dy >= 30) {
+    softDrop();
+    touchLastY = t.clientY;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  if (!isPlaying || isPaused || gameOver) return;
+  const dt = Date.now() - touchTime;
+  const dx = touchLastX - touchStartX;
+  const dy = touchLastY - touchStartY;
+
+  // 快速点击（未移动）= 旋转
+  if (dt < 200 && Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+    rotatePiece();
+  }
+  // 快速大幅度向下滑动 = 硬降
+  else if (dy > 100 && dt < 300) {
+    hardDrop();
+  }
+}, { passive: false });
+
+// ==================== 启动按钮 ====================
+startBtn.addEventListener('click', () => {
+  if (isPaused && !gameOver) {
+    togglePause();
+  } else {
+    startGame();
+  }
+});
+
+// ==================== 初始绘制 ====================
+initBoard();
+draw();
+showOverlay('准备就绪', '按开始或空格键开始游戏', 'pause', '开始游戏');
+animFrame = requestAnimationFrame(update);
+</script>
+
+</body>
+</html>
